@@ -1,0 +1,143 @@
+---
+title: "ATTRITION REPORT"
+output: html_document
+date: '`r Sys.Date()`'
+---
+## dataset link
+https://data.world/aaizemberg/hr-employee-attrition
+
+## Reading the dataset
+
+```{r}
+dataset<-read.csv("C:\\Users\\anish\\Downloads\\employee attrition dataset .csv")
+View(dataset)
+summary(dataset)
+at<-dataset
+data_at<-at[-c(4,9,10,28)]
+```
+
+## Employee attrition by department(bar graph)
+
+```{r}
+library(ggplot2)
+ggplot(data_at, aes(x = Department, fill = Attrition )) +
+  geom_bar() +
+  labs(title = "Employee Attrition by Department",
+       x = "Department",
+       y = "Number of Employees") +
+  scale_fill_manual(values = c("grey80", "red"), labels = c("No", "Yes"))
+```
+
+## Employee attrition by job role for R&D department(pie chart)
+
+```{r}
+attrition_yes <- subset(data_at, Attrition == "Yes")
+depart_yes <- subset(attrition_yes, Department == "Research & Development")
+ggplot(depart_yes, aes(x = "", fill = JobRole)) +
+  geom_bar(width = 1) +
+  coord_polar(theta = "y") +
+  labs(title = "Employee Attrition by Job Role in RESEARCH And DEVELOPMENT",
+       fill = "Job Role",
+       x = "",
+       y = "") +
+  theme_void()
+```
+
+## Distribution of employee age(histogram)
+
+```{r}
+ggplot(attrition_yes, aes(x = Age)) +
+  geom_histogram(binwidth = 5, color = "black", fill = "lightblue") +
+  labs(title = "Distribution of Employees age",
+       x = "Age",
+       y = "Count") +
+  scale_x_continuous(breaks = seq(18, 65, by = 5))
+
+```
+
+## Employees salary hike(violin graph)
+
+```{r}
+ggplot(attrition_yes, aes(x = Attrition, y =PercentSalaryHike, fill = Attrition)) +
+  geom_violin() +
+  geom_jitter(width = 0.1) +
+  labs(title = "Distribution of Salary Hike for Employees with Attrition",
+       x = "Attrition",
+       y = "Salary Hike",
+       fill = "Attrition") +
+  scale_fill_manual(values = c("lightblue"))
+```
+
+## Employee job involvement and job satisfaction(heat map)
+
+```{r}
+library(magrittr)
+library(dplyr)
+heatmap_data <- data_at %>%
+  filter(Attrition == "Yes") %>%
+  group_by(JobInvolvement, JobSatisfaction) %>%
+  summarise(n = n(), .groups = "drop")
+
+ggplot(heatmap_data, aes(x = JobInvolvement, y = JobSatisfaction, fill = n)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "darkblue") +
+  labs(title = "Heatmap of Job Involvement and Job Satisfaction for Attrition = Yes",
+       x = "Job Involvement",
+       y = "Job Satisfaction",
+       fill = "Count") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Employee rating by mean values(radar chart)
+
+```{r}
+library(fmsb) 
+job_satisfaction<-2.527
+job_involvement<-2.497
+performance_rating<-3.156
+relationship_satisfication<-2.641
+worklife_balance<-2.647
+chart1<-data.frame(job_satisfaction =c(4,1,2.527), 
+                   job_involvement=c(4,1,2.497),
+                   performance_rating =c(4,1,3.156),
+                   relationship_satisfication_manager=c(4,1,2.641),
+                   worklife_balance=c(4,1,2.647))
+radarchart(chart1,
+           seg = 4,
+           title= "employee_rating",
+           pfcol = scales::alpha("purple",0.3),
+           plwd = 2)
+```
+
+## Marital status with gender(clustered bar graph)
+
+```{r}
+ggplot(attrition_yes, aes(x =MaritalStatus , fill =  Gender )) +
+  geom_bar() +
+  labs(title = "maritalstatus with gender",
+       x = "marital status",
+       y = "Number of Employees") +
+  scale_fill_manual(values = c("lightblue", "lightgreen"), labels = c("female", "male"))
+```
+
+## No.of.years with current manager by department(area chart)
+
+```{r}
+ggplot(attrition_yes, aes(x=YearsWithCurrManager, y=..count.., fill=Department)) +
+  geom_area(stat="bin") +
+  labs(title="No.of.years with current manager by department",x="Years with current manager", y="Count", fill="Attrition") +
+  scale_fill_manual(values=c("#00AFBB", "#E7B800","red"))
+```
+
+## Employee overtime(pie chart)
+
+```{r}
+ggplot(attrition_yes, aes(x = "", fill =OverTime)) +
+  geom_bar(width = 1) +
+  coord_polar(theta = "y") +
+  labs(title = "empoyees overtime",
+       fill = "overtime",
+       x = "",
+       y = "") +
+  theme_void()
+```
