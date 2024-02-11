@@ -1,0 +1,208 @@
+##LOAD THE DATA
+##EDA
+
+```{r}
+loan<-read.csv("C:\\Users\\anish\\Downloads\\loan dataset CIA 2.csv")
+head(loan,5)
+str(loan)
+summary(loan)
+nrow(loan)
+```
+
+##IMPUTATION USING AMELIA FOR NUMERIC VALUES
+##load the new dataset
+```{r}
+loan_df<-read.csv("C:\\Users\\anish\\Downloads\\loan dataset CIA 2-imp1.csv")
+head(loan_df,5)
+
+```
+
+##IMPUTE THE CATEGORICAL VARIABLES WITH MODE
+##as we have less no.of.data so we are not removing the missing values
+```{r}
+# install.packages("dplyr")
+library(dplyr)
+# Calculate mode function
+calculate_mode <- function(x) {
+  uniq_x <- unique(x)
+  uniq_x[which.max(tabulate(match(x, uniq_x)))]
+}
+# Replace missing values with the mode value
+loan_df <- loan_df %>% 
+  mutate(Self_Employed = ifelse(is.na(Self_Employed), calculate_mode(Self_Employed), Self_Employed))
+
+head(loan_df,5)
+```
+
+##QUESTION 1 [A]
+##ANOVA test
+```{r}
+loan_df$Default<-ifelse(loan_df$Loan_Status=="Y",1,0)
+loan_df$s_e.Yes<-ifelse(loan_df$Self_Employed=="Yes",1,0)
+boxplot(loan_df$Default  ~loan_df$s_e.Yes)
+aov.se<-aov(loan_df$Default  ~loan_df$s_e.Yes)
+summary(aov.se)
+```
+
+so here P-value associated with F-values is more than the alpha [0.05]. so self_employed is not significant to loan approval.
+##[B]
+```{r}
+loan_df$Graduate<-ifelse(loan_df$Education=="Graduate",1,0)
+boxplot(loan_df$Default  ~loan_df$Graduate)
+aov.se<-aov(loan_df$Default  ~loan_df$Graduate)
+summary(aov.se)
+```
+
+so here P-value associated with F-values is less than the alpha [0.05].so graduarte will influence the loan approval. 
+##[C]
+```{r}
+boxplot(loan_df$LoanAmount~loan_df$Dependents)
+aov.d<-aov(loan_df$LoanAmount  ~loan_df$Dependents)
+summary(aov.d)
+tk.d<-TukeyHSD(aov.d)
+tk.d
+```
+
+so here P-value associated with F-values is less than the alpha [0.05]. so no.of.dependents can influence the loan amount.
+##QUESTION 2
+```{r}
+loan_df$income<-(loan_df$ApplicantIncome + loan_df$CoapplicantIncome)
+loan_df$year<-(loan_df$Loan_Amount_Term/12)
+loan_df$principle_amount_per_month<-(loan_df$LoanAmount / loan_df$Loan_Amount_Term)
+head(loan_df,5)
+```
+
+INCOME = applicant income + co-applicant income
+YEAR = loan amount term / 12 
+Principle amount per month = loan amount / loan amount term.
+
+##QUESTION 3
+##converting categorical variable in to binary values.
+
+```{r}
+loan_df$Gender.male<-ifelse(loan_df$Gender=="Male",1,0)
+loan_df$Married.myes<-ifelse(loan_df$Married=="Yes",1,0)
+loan_df$Property_Area.urban<-ifelse(loan_df$Property_Area=="Urban",1,0)
+loan_df$Property_Area.Semiurban<-ifelse(loan_df$Property_Area=="Semiurban",1,0)
+loan_df$Property_Area.Rural<-ifelse(loan_df$Property_Area=="Rural",1,0)
+```
+
+##correlation
+```{r}
+#correlation
+Loan.Scatter<-subset(loan_df[,c(7:11,14:24)])
+#install.packages("corrplot")
+library(corrplot)
+correlations<- cor(Loan.Scatter)
+corrplot(correlations, method="circle")
+```
+
+##DATA SPLIT
+##REMOVING THE CATEGORICAL VARIABLE
+```{r}
+set.seed(1)
+loan_dff <- loan_df[, -c(1, 2, 3, 4, 5, 6, 12, 13)]
+head(loan_dff,5)
+
+#Use 70% of dataset as training set and remaining 30% as testing set
+sample <- sample(c(TRUE, FALSE), nrow(loan_dff), replace=TRUE, prob=c(0.7,0.3))
+train <- loan_dff[sample, ]
+test <- loan_dff[!sample, ]
+
+```
+
+##MODEL 1 -full model
+```{r}
+model1<- glm(Default ~ ., family="binomial", data=train)
+
+#disable scientific notation for model summary
+options(scipen=999)
+
+#view model summary
+summary(model1)
+
+#rsqr
+library(pscl)
+pscl::pR2(model1)["McFadden"]
+
+```
+
+##MODEL 2 - variable selected based on the anva test
+```{r}
+model2<- glm(Default ~ Credit_History+Graduate+Married.myes+Property_Area.Semiurban+Property_Area.Rural , family="binomial", data=train)
+#disable scientific notation for model summary
+options(scipen=999)
+
+#view model summary
+summary(model2)
+
+#rsqr
+library(pscl)
+pscl::pR2(model2)["McFadden"]
+
+```
+
+##VIF SCORE 
+```{r}
+#calculate VIF values variance inflation factor
+car::vif(model2)
+```
+ VIF score is to find the multicorrelation between the variables. it should be less than 5. so here every variables are satisfied. so there is no multicorrelation.
+
+##USE MODEL TO MAKE PREDICTIONS
+```{r}
+predicted <- predict(model2, test, type="response")
+```
+
+##MODEL DIAGNOSTICS
+```{r}
+library(devtools)
+devtools::install_github("selva86/InformationValue")
+library(InformationValue)
+library(pROC)
+test$Default <- ifelse(test$Default=="Yes", 1, 0)
+
+```
+
+##CONFUSION MATRIX
+```{r}
+#create confusion matrix
+confusionMatrix(test$Default, predicted)
+```
+
+
+##METRIC
+```{r}
+# Your existing confusion matrix
+conf_matrix <- matrix(c(41, 143, 0, 0), nrow = 2, byrow = TRUE,
+                      dimnames = list(Actual = c(0, 1), Predicted = c(0, 1)))
+
+# Calculate accuracy
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+accuracy
+
+# Calculate precision
+precision <- conf_matrix[2, 2] / sum(conf_matrix[, 2])
+precision
+
+# Calculate recall (sensitivity)
+recall <- conf_matrix[2, 2] / sum(conf_matrix[2, ])
+recall
+
+# Calculate F1 score
+f1_score <- 2 * (precision * recall) / (precision + recall)
+f1_score
+
+# Calculate false positive rate
+false_positive_rate <- conf_matrix[1, 2] / sum(conf_matrix[1, ])
+false_positive_rate
+
+# Calculate false negative rate
+false_negative_rate <- conf_matrix[2, 1] / sum(conf_matrix[2, ])
+false_negative_rate
+
+# Calculate total misclassification error rate
+misclassification_error <- (conf_matrix[1, 2] + conf_matrix[2, 1]) / sum(conf_matrix)
+misclassification_error                         
+
+```
