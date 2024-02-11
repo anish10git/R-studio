@@ -1,0 +1,67 @@
+#sep 1
+library(tseries)
+library(forecast)
+library(quantmod)
+library(xts)
+library(FinTS)
+library(rugarch)
+library(fGarch)
+
+#step 2
+sun_df<-read.csv("C:\\Users\\anish\\Desktop\\data\\cl.csv")
+sun_df
+
+#stpe 3 eda
+str(sun_df)
+sun_hist<-hist(sun_df$cl)
+plot_density(sun_df$cl)
+describe(sun_df$cl)
+
+#step 4 create ts object
+sun_ts<-ts(sun_df$cl)
+
+#step 5 perform TSA
+plot(sun_ts)
+# it is non stationarity
+
+#step 6 check for non stationarity
+adf.test(sun_ts)
+kpss.test(sun_ts)
+Acf(sun_ts)
+
+#step 7 convert non-stationarity to stationarity------so differnce is like the returns . this is the difference between the current close price and previous close price divide by previous price
+sun_dif<-diff(log(sun_ts))
+plot(sun_dif)
+adf.test(sun_dif)
+kpss.test(sun_dif)
+
+#step 8 test the volatility
+plot.ts(sun_dif)
+# there is a volatility
+
+#step 9 test for ARCH effect
+ArchTest(sun_dif)
+
+#less p value so there is a arch effect.  
+#we need hetroscadatcity
+#ho:no arch effect         ha: arch effect
+# only when there is arch effect go for GARCH 
+
+#model build
+sun_diff_garch_spec <-ugarchspec(variance.model = list(model="sGARCH", garchOrder=c(1,1)),mean.model=list(armaOrder=c(0,0)),distribution.model="norm")
+
+sun_diff_garch_fit<-ugarchfit(sun_diff_garch_spec,data=sun_dif)
+sun_diff_garch_fit
+plot(sun_diff_garch_fit)
+#forecast
+sun_diff_garch_fcast<-ugarchforecast(sun_diff_garch_fit,n.ahead = 20)
+sun_diff_garch_fcast
+
+plot(sun_diff_garch_fcast)
+#GARCH PROCESS                                                                                                                                                                                                                              
+#1.test for stationarity
+#2.test for volatility clustering
+#3.check ARCH effect
+#4.specify GARCH model
+#5.fit GARCH (1,1)
+#6.forecast volatility
