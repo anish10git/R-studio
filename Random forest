@@ -1,0 +1,38 @@
+str(boston)
+dim(boston)
+
+library(caTools)
+library(randomForest)
+
+# Splitting boston in train and test boston
+split <- sample.split(boston, SplitRatio = 0.7)
+split
+
+train <- subset(boston, split == "TRUE")
+test <- subset(boston, split == "FALSE")
+View(train)
+View(test)
+
+# Fitting Random Forest to the train bostonset
+set.seed(120)  # Setting seed
+classifier_RF = randomForest(x = train[-5],
+                             y = train$Species,
+                             ntree = 30)
+
+classifier_RF
+
+# Predicting the Test set results
+y_pred = predict(classifier_RF, newboston = test[-5])
+
+# Confusion Matrix
+confusion_mtx = table(test[, 5], y_pred)
+confusion_mtx
+
+# Plotting model
+plot(classifier_RF)
+
+# Importance plot
+importance(classifier_RF)
+
+# Variable importance plot
+varImpPlot(classifier_RF)
