@@ -1,0 +1,313 @@
+#
+library(forecast)
+library(tseries)
+library(fpp)
+library(TTR)
+library(TSA)
+library(strucchange)
+library(psych)
+library(DataExplorer)
+library(quantmod)
+library(xts)
+library(FinTS)
+library(rugarch)
+library(fGarch)
+library(ggplot2)
+
+
+cod<-read.csv("C:\\Users\\anish\\Downloads\\capstone dataset\\cl.f.CSV")
+cod
+str(cod)
+plot(cod_ts)
+cod_ts<-ts(cod$value,start = c(2019,1), frequency = 365)
+cod_ts
+str(cod_ts)
+summary(cod_ts)
+
+seasonplot(cod_ts)
+
+plot(cod_ts)
+cod_trend<-stl(cod_ts,s.window = "period")
+cod_trend
+plot(cod_trend)
+
+adf.test(cod_ts)
+kpss.test(cod_ts)# we choose kpss tect
+
+ndiffs(cod_ts)#how many steps is done to change to stationary data
+cod_diff<-diff(cod_ts, difference=365)
+plot(cod_diff)
+ndiffs(cod_diff)
+
+adf.test(cod_diff)
+kpss.test(cod_diff)
+
+
+Acf(cod_diff)
+pacf(cod_diff)
+
+#ARIMA MODEL BUILDING
+arima_fdi<-Arima(cod_ts,order = c(3,1,0),seasonal = list(order=c(2,1,0),365))
+summary(arima_fdi)
+
+#FORECAST
+arima_fdi_fs<-forecast(arima_fdi,h=50)
+head(arima_fdi_fs,5)
+arima_fdi_fs
+plot(arima_fdi_fs)
+#------------------------------------------------------------------------------------
+#SARIMA Model
+
+# Fit SARIMA model
+sarima_model <- auto.arima(cod_ts, d=1)
+sarima_model
+# Generate forecasts for SARIMA model
+sarima_forecast <- forecast(sarima_model, h = 250)  
+sarima_forecast
+# Print model summary
+summary(sarima_model)
+
+
+# Plot the forecast
+plot(forecast(sarima_model))
+
+# Diagnostic plots
+checkresiduals(sarima_model)
+#---------------------------------------------------------------------------------------------------
+#mooving average
+ma<-Arima(cod_ts,order=c(0,1,2))
+ma_forecast<-forecast(ma,h=250)
+ma_forecast
+plot(ma_forecast)
+summary(ma_forecast)
+#--------------------------------------------------------------------------------------------------
+#exponential smoothing
+plot(cod_ts)
+fdi_es_3<-ets(cod_ts,model = "MMN")
+fdi_es_3
+
+fdi_es_3_forecast<-forecast(fdi_es_3,h=250)
+fdi_es_3_forecast
+
+y_axis_min <- 0
+y_axis_max <- 10
+plot(fdi_es_3_forecast, ylim = c(y_axis_min, y_axis_max))
+
+aic_value_cod_es_3<- AIC(fdi_es_3)
+aic_value_cod_es_3
+
+accuracy(fdi_es_3)
+#------------------------------
+#PROPHET         as we dont have seasonality, it does not fit.
+
+# Load the Prophet library
+# Load the required libraries
+library(prophet)
+library(lubridate)
+
+# Data preparation
+ds <- dmy(cod$date)  # Convert "day month year" to "year month day"
+y <- cod$value
+d <- data.frame(ds, y)
+
+# Create a Prophet model with linear growth
+a_prophet <- prophet(d, growth = "linear")
+a_prophet <- prophet(d, growth = "linear", daily.seasonality = TRUE)
+
+# Create a future dataframe for prediction (forecasting 100 periods)
+future <- make_future_dataframe(a_prophet, periods = 250)  # Adjust the number of periods as needed
+
+# Forecast
+a_forecast <- predict(a_prophet, future)
+
+# Plot the forecast
+plot(a_prophet, a_forecast)
+
+#GARCH MODEL-------------------------------------------------
+
+#test for arch effect
+ArchTest(cod_diff)
+
+##model build
+fdi_garch<-ugarchspec(variance.model = list(model="sGARCH", garchOrder=c(1,1)),mean.model=list(armaOrder=c(0,0)),distribution.model="norm")
+
+fdi_garch_fit<-ugarchfit(fdi_garch,data=fdi_diff)
+fdi_garch_fit
+plot(fdi_garch_fit)
+#forecast
+fdi_garch_fcast<-ugarchforecast(fdi_garch_fit,n.ahead = 100)
+fdi_garch_fcast
+
+# Plot the GARCH forecast
+plot(fdi_garch_fcast)
+
+#----------------------------------------------------------------------------
+#mooving average
+ma<-Arima(cod_ts,order=c(0,0,3))
+ma_forecast<-forecast(ma,h=36)
+ma_forecast
+plot(ma_forecast)
+summary(ma_forecast)
+#-------------------------------
+#manual
+cod_diff1<-diff(diff(cod_ts),12)# use this if ts is non stationary[12 denotes month]
+
+Acf(cod_diff1)
+pacf(cod_diff1)
+
+#identify small pdq
+#p - in pacf first line should have 95% of band if not then it is "0"
+#d - our ts is stationary so it is "0"
+#q - in Acf first line should have 95% of band if not then it is "0"
+#(p,d,q)=(0,0,0)
+#CAPITAL P -in pacf 12 line must cross the blue line then it is significant, but it is not crossing here, so "0"
+#D it is "1" because we have done 1 differencing using 12 lag------------------------------------------[1]
+#Q -in Acf 12 lag should cross the band line.
+#(P,D,Q)=(0,1,0)
+
+####################smallpdq=(0,1,0)             big pdq(1,1,1)
+
+arima_cod_am2<-Arima(cod_ts,order = c(0,1,0),seasonal = list(order=c(1,1,1),12))
+summary(arima_cod_am2)
+
+#STEP 7 
+#FORECAST
+arima_cod_fs2<-forecast(arima_cod_am2,h=36)
+arima_cod_fs2
+plot(arima_cod_fs2)
+
+#step8
+#model diagnostic
+Acf(arima_cod_am2$residuals)
+Box.test(arima_cod_am2$residuals,type = "Ljung-Box") #NULL HYPOTHESIS : NO AUTOCORRELATIONS WITH RESIDUALS
+
+aic_value_manual_arima <- AIC(arima_cod_am2)
+aic_value_manual_arima
+
+accuracy(arima_cod_am2)
+#--------------------------------
+#exponential smooting
+#single smoothing
+
+#levels of the series
+cod_es_1<-ets(cod_ts,model = "MNN")
+cod_es_1
+plot(cod_es_1)
+
+cod_es_1_forecast<-forecast(cod_es_1,h=36) #h stands for ahaed 
+cod_es_1_forecast
+
+plot(cod_es_1_forecast)
+
+aic_value_cod_es_1 <- AIC(cod_es_1)
+aic_value_cod_es_1 
+
+accuracy(cod_es_1)
+
+#double exponential smoothing 
+cod_es_2<-ets(cod_ts,model = "MMN")
+cod_es_2
+
+cod_es_2_forecast<-forecast(cod_es_2,h=36)
+cod_es_2_forecast
+
+plot(cod_es_2_forecast)
+
+
+aic_value_cod_es_2 <- AIC(cod_es_2)
+aic_value_cod_es_2
+
+accuracy(cod_es_2)
+
+#Triple exponential smoothing
+cod_es_3<-ets(cod_ts,model = "MMM")
+cod_es_3
+
+cod_es_3_forecast<-forecast(cod_es_3,h=36)
+cod_es_3_forecast
+
+plot(cod_es_3_forecast)
+
+
+aic_value_cod_es_3<- AIC(cod_es_3)
+aic_value_cod_es_3
+
+accuracy(cod_es_3)
+
+#-----------------------------------------------------------
+
+# Load required libraries if not already loaded
+library(quantmod)
+library(rugarch)
+
+# Load your financial data (replace 'fdi_diff' with your actual data)
+# Example: fdi_diff <- read.csv("your_data.csv")
+
+# Test for ARCH effect (if needed)
+ArchTest(cod_ts)
+
+# Specify the GARCH model
+garch_spec <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)),
+                         mean.model = list(armaOrder = c(1, 0)),
+                         fixed.pars = list(alpha1 = 0.1, beta1 = 0.8))
+
+
+
+any(is.na(cod_diff))
+any(!is.finite(cod_diff))
+
+cod_diff_scaled <- scale(cod_diff)
+garch_fit <- ugarchfit(garch_spec, data = cod_diff_scaled, solver.control = list(trace = 0, algorithm = 6))
+
+
+
+# Fit the GARCH model
+garch_fit <- ugarchfit(garch_spec, data = cod_diff, solver.control = list(trace = 0, algorithm = 6))
+
+
+garch_fit
+
+# Plot the GARCH model
+plot(garch_fit)
+
+# Generate GARCH forecasts
+n_ahead <- 100
+garch_forecast <- ugarchforecast(garch_fit, n.ahead = n_ahead)
+garch_forecast
+
+# Plot the GARCH forecast
+plot(garch_forecast)
+
+accuracy(garch_fit)
+
+
+#--------------------------------------------
+#import
+air<-read.csv("C:\\Users\\anish\\Downloads\\capstone dataset\\cl.f.CSV")
+air
+
+# Install and load required packages
+install.packages("prophet")
+library(prophet)
+
+# Read the dataset
+air <- read.csv("C:\\Users\\anish\\Downloads\\capstone dataset\\cl.f.CSV")
+
+
+# Convert 'date' to a Date object
+air$date <- as.Date(air$date)
+
+# Prepare the data in the required format for prophet
+data <- data.frame(ds = air$date, y = air$value)
+
+# Initialize and fit the prophet model
+m <- prophet(data)
+
+# Make a dataframe with future dates for prediction
+future <- make_future_dataframe(m, periods = 365)  # Adjust the number of periods as needed
+
+# Predict using the fitted model
+forecast <- predict(m, future)
+
+# Plot the forecast
+plot(m, forecast)
