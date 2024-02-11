@@ -1,0 +1,19 @@
+#REGRESSION
+boston<-read.csv(file.choose())
+boston
+
+set.seed(1234)
+boston_mixed<- boston[order(runif(1:506)),]
+boston_training<-boston_mixed[1:350,]
+boston_testing<-boston_mixed[351:506,]
+
+boston_model_final<-lm(MEDV~ CRIM + NOX + RM + RAD + PTRATIO + B + LSTAT + TAX,boston=boston_training)
+summary(boston_model_final)
+
+boston_product<-predict(boston_model_final,newboston=boston_testing)# here we need to remove the sales -as sales is the answer.so always remove the tearget variable.always shoe the independent values.
+boston_product
+
+boston_residual<-boston_testing$MEDV-boston_product
+summary(boston_residual)
+
+sqrt(mean(boston_residual^2))
