@@ -1,0 +1,124 @@
+#Vector Auto Regression
+
+df<-read.csv("C:\\Users\\anish\\Downloads\\trade_deficit.csv")
+#Explore Data
+names(df)
+str(df)
+cor(df[-1])
+#Get Libraries
+library(psych)
+library(DataExplorer)
+library(tseries)
+library(forecast)
+library(strucchange)
+install.packages("vars")
+library(vars)
+install.packages("stargazer")
+library(stargazer)
+#Plot the timeseries plots of the endogenous variables
+plot.ts(df$Tdeficit, xlab="", ylab="", main="TradeDeficit", col="blue")
+plot.ts(df$Crude_oil, xlab="", ylab="", main="CrudeOil", col="red")
+plot.ts(df$Exchange_Rate, xlab="", ylab="", main="XRate", col="red")
+plot.ts(df$Inflation, xlab="", ylab="", main="Inflation", col="blue")
+plot.ts(df$NCI,xlab="", ylab="", main="NiftyConsumptionIndex", col="blue")
+#ADF test
+adf.test(df$Tdeficit)
+adf.test(df$Crude_oil)
+adf.test(df$Exchange_Rate)
+adf.test(df$Inflation)
+adf.test(df$NCI)
+# Looks like the endogenous variables have trend, hence we need to convert them into stationarity by first differencing
+dl.TDeficit <- diff(df$Tdeficit)
+dl.Crude_oil <- diff(df$Crude_oil)
+dl.Exchange_Rate <- diff(df$Exchange_Rate)
+dl.inflation<-diff(df$Inflation)
+dl.NCI <- diff(df$NCI)
+#ADF-Differenced series
+adf.test(dl.TDeficit)
+#adf.test(dl.Crude_oil)
+adf.test(dl.Exchange_Rate)
+adf.test(dl.inflation)
+adf.test(dl.NCI)
+#Plot the tsplots of differenced series
+plot.ts(dl.TDeficit, xlab="", ylab="", main="TradeDeficit", col="blue")
+plot.ts(dl.Exchange_Rate, xlab="", ylab="", main="XRate", col="red")
+plot.ts(dl.inflation, xlab="", ylab="", main="Inflation", col="red")
+plot.ts(dl.NCI, xlab="", ylab="", main="NiftyConsumptionIndex", col="blue")
+plot.ts(dl.Crude_oil, xlab="", ylab="", main="CrudeOil", col="red")
+
+#Rename the variables for convenience
+y1 <- dl.TDeficit
+y2 <- df$Crude_oil
+y3<-dl.Exchange_Rate
+y4<-dl.inflation
+y5 <- dl.NCI
+
+var_df<- cbind(y1,y2,y3,y4,y5)
+var_df
+# Optimal lag selection criteria summary
+VARselect(var_df)
+
+#Build VAR model of lag order 10
+var_model1<-VAR(var_df, ic="AIC",lag.max=10,type="const")
+var_model1
+summary(var_model1)
+
+# using stargazer package to report results of VAR estimation
+lmp1<-var_model1$varresult
+lmp1
+stargazer(lmp1$y1, lmp1$y2,lmp1$y3,lmp1$y4, type="text", dep.var.labels.include=FALSE)
+
+# Granger causality
+names(df)
+causality(var_model1, cause="y1")
+causality(var_model1, cause="y2")
+causality(var_model1, cause="y3")
+causality(var_model1, cause="y4")
+causality(var_model1, cause="y5")
+#Predict for future 12 periods
+par(mar = rep(2, 4))
+#var_forecast <- predict(var_model, n.ahead=12)
+var_forecast1<-predict(var_model1,n.ahead=12)
+plot(var_forecast1)
+fanchart(var_forecast1)
+#Residuals
+model.serial<-serial.test(var_model1, lags.pt = 12, type = "PT.asymptotic")
+model.serial
+# IRFs - based on Choleski decomposition of var(e)
+#var_irfs1 <- irf(var_model1, n.ahead=12)
+#par(mfcol=c(2,2), cex=0.6)
+#plot(var_irfs1, plot.type="single")
+
+# FEVD - based on Choleski decomposition of var(e)
+#varp.fevd <- fevd(var_model, n.ahead=40)
+#varp.fevd[[1]][c(1,4,8,40),]
+#varp.fevd[[2]][c(1,4,8,40),]
+#plot(varp.fevd)
+#plot(varp.fevd, addbars=8)
+
+#IRF
+irf.y1<- irf(var_model1, impulse = "y1", response = "y1", 
+             n.ahead = 12,ortho=TRUE, boot = TRUE,ci=0.95)
+plot(irf.y1, ylab = "ouput", main = "Response of Trade Deficit to Trade Deficit")
+
+irf.y1<- irf(var_model1, impulse = "y2", response = "y1", 
+             n.ahead = 40, ortho=TRUE,boot = TRUE,ci=0.95)
+plot(irf.y1, ylab = "ouput", main = "Response of Crude Oil to Trade Deficit")
+
+irf.y1<- irf(var_model1, impulse = "y3", response = "y1", 
+             n.ahead = 40, boot = TRUE)
+plot(irf.y1, ylab = "ouput", main = "Response of Exchange Rate to Trade Deficit")
+
+irf.y1<- irf(var_model1, impulse = "y4", response = "y1", 
+             n.ahead = 40, boot = TRUE)
+plot(irf.y1, ylab = "ouput", main = "Response of Inflation to Trade Deficit")
+
+irf.y1<- irf(var_model1, impulse = "y5", response = "y1", 
+             n.ahead = 40, boot = TRUE)
+plot(irf.y1, ylab = "ouput", main = "Response of Consumption to Trade Deficit")
+
+plot(model.serial, names = "y1")
+plot(model.serial, names = "y2")
+plot(model.serial, names = "y3")
+plot(model.serial, names = "y4")
+plot(model.serial, names=  "y5")
