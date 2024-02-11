@@ -1,0 +1,162 @@
+#-------------GBM Regression-----------------
+
+#step 1 Get libraries
+
+library(caret)
+library(gbm)
+
+#step 2 import boston
+
+
+#step 3 perform EDA 
+#1 Distribution, Correlation and Heatmap
+
+
+#step 4 split boston boston partition 
+set.seed(1234)
+GBM_mixed<-createbostonPartition(boston$MEDV,p=.7,list=FALSE)
+GBMtrain<-boston[GBM_mixed,]
+GBM_test<-boston[-GBM_mixed,]
+
+#step 5 Develop Gradient boosting model
+boston_gbm<-gbm(MEDV~.,boston = GBMtrain, distribution = "gaussian",cv.folds = 10,shrinkage = 0.01,n.minobsinnode = 10,n.trees = 500)
+
+#hyper parameters 
+#distribution ="gussian" used for gussian loss
+#shrinkage/ learning rate
+#n.minobsinode=10 bcoz we need this to performe split boston process
+#n.tress 
+
+#step 6 Predict the test boston
+predicit_gbm<-predict.gbm(boston_gbm,newboston = GBM_test[-1])
+
+#step 7 residual Diagnostics
+res_boston<-GBM_test$MEDV-predicit_gbm
+
+library(Metrics)
+library(car)
+library(lmtest)
+plot(res_boston)
+
+durbinWatsonTest(residuals)
+
+#XGBOOST
+
+#XGBoost Classifier
+install.packages("xgboost")
+
+library(xgboost)
+library(magrittr)
+library(dplyr)
+library(Matrix)
+library(caret)
+
+str(boston)
+
+set.seed(1234)
+ind<-sample(2,nrow(boston),replace=T,prob=c(0.7,0.3))
+train<-boston[ind==1,]
+test<-boston[ind==2,]
+names(train)
+str(train)
+#Create Matrix and OHE
+#every variable should be nnumeric ffor xgboost , so we do kind of a one-hot encoding , it creates a sparse matrix(more 0s)
+#problem of ohe ,if many levels are  there , you increase dimensions and lead to hueghs phenomena.
+
+
+trainm<-sparse.model.matrix(MEDV ~.-1,boston=train)
+
+#admit is the response variable
+head(trainm)
+
+train_label<-train[,"MEDV"]
+train_matrix<-xgb.DMatrix(boston=as.matrix(trainm),label=train_label)
+
+test_label<-test[,"MEDV"]
+testm<-sparse.model.matrix(MEDV~.-1,boston=test)
+test_matrix<-xgb.DMatrix(boston=as.matrix(testm),label=test_label)
+
+#Parameters
+
+
+xgb_params<-list("objective"="reg:squarederror")
+
+#softmax- it outputs a probability for each class.
+# logloss - its also called as mlogloss.
+#Shanon cross entropy - E = 1/n (sum-(yilog2pi+-(1-yi)log2(1-pi)))
+#nc = number of classes
+watchlist<-list(train=train_matrix,test=test_matrix) # to ensure that we can compare the performance of train and testing
+#Xtreme Gradient Boosting Model
+
+bst_model<-xgb.train(params=xgb_params, boston=train_matrix, nround=100, watchlist=watchlist)
+
+#Include some more hyperparameters
+
+bst_model<-
+  xgb.train(
+    boston = train_matrix,
+    label = train_label,
+    nrounds = 100,
+    objective = "reg:squarederror",
+    early_stopping_rounds = 3,
+    max_depth = 3,
+    watchlist=watchlist, eta = .3
+  )
+
+
+#Feature importance
+
+imp<-xgb.importance(colnames(train_matrix),model=bst_model)
+print(imp)
+xgb.plot.importance(imp)
+
+
+# Plot errors
+error <- boston.frame(bst_model$evaluation_log)
+plot(error$iter, error$train_rmse, col = "blue", type = "l", lty = 1, xlab = "Iteration", ylab = "RMSE", main = "Training and Testing Errors")
+lines(error$iter, error$test_rmse, col = "red", type = "l", lty = 1)
+legend("topright", legend = c("Training", "Testing"), col = c("blue", "red"), lty = 1)
+
+# Find the iteration with the minimum testing error
+min_error_index <- which.min(error$test_rmse)
+min_test_error <- error$test_rmse[min_error_index]
+min_test_error_iteration <- error$iter[min_error_index]
+
+cat("Minimum Testing RMSE:", min_test_error, "at iteration", min_test_error_iteration, "\n")
+
+#GRID SEARCH
+# Define the hyperparameter grid
+param_grid <- expand.grid(
+  nrounds = c(100, 500, 1000),
+  max_depth = c(3, 5, 7),
+  eta = c(0.1, 0.2, 0.3),
+  gamma = 0,
+  colsample_bytree = 1,
+  min_child_weight = 1,
+  subsample = 1
+)
+
+# Perform grid search using caret
+ctrl <- trainControl(method = "cv", number = 5)  # 5-fold cross-validation
+xgb_grid <- train(
+  x = as.matrix(trainm),
+  y = train_label,
+  method = "xgbTree",
+  trControl = ctrl,
+  tuneGrid = param_grid,
+  metric = "RMSE",  # Use RMSE as the evaluation metric for regression
+  tuneLength = 5  # Specify the number of combinations to try
+)
+
+# Get the best model
+best_model <- xgb_grid$finalModel
+
+# Print the best hyperparameters
+print(xgb_grid)
+
+# Make predictions on the test set using the best model
+predictions <- predict(best_model, newboston = as.matrix(testm))
+
+# Evaluate performance using RMSE
+performance <- sqrt(mean((predictions - test_label)^2))
+print(paste("Root Mean Squared Error on Test Set:", performance))
