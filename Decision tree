@@ -1,0 +1,26 @@
+#decision tree
+library(rpart)
+library(rpart.plot)
+str(e_nd)
+
+X <- e_nd[, -which(names(e_nd) == "converted_in_7days")]
+y <- e_nd$converted_in_7days
+
+# Split the data into training and testing sets
+set.seed(42)  # For reproducibility
+train_indices <- sample(1:nrow(e_nd), 0.7 * nrow(e_nd))  # 70% for training
+X_train <- X[train_indices, ]
+y_train <- y[train_indices]
+X_test <- X[-train_indices, ]
+y_test <- y[-train_indices]
+
+# Create a decision tree model
+tree_model <- rpart(converted_in_7days ~ ., data = e_nd, method = "class")
+pl <- rpart.plot(tree_model, box.palette = "white")
+
+# Make predictions on the test data
+y_pred <- predict(tree_model, newdata = e_nd[-train_indices, ], type = "class")
+
+# Calculate the accuracy of the model
+accuracy <- sum(y_pred == y[-train_indices]) / length(y[-train_indices])
+cat("Accuracy:", accuracy * 100, "%\n")
