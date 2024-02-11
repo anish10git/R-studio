@@ -1,0 +1,188 @@
+# k-mean clustering
+
+
+#library
+library(NbClust)
+library(fpc)
+library(cluster)
+library(factoextra)
+library(tidyverse)
+library(ggpubr)
+library(flexclust)
+library(useful)
+library(psych)
+
+#load
+es<-read.csv("C:\\Users\\anish\\Downloads\\XOMCVX.csv")
+es
+
+#eda
+str(es)
+describe(es)
+
+#scale the data
+es_scale<-scale(es[-1])
+es_scale
+
+#decide the no of cluster
+nc_es <-NbClust(es_scale, min.nc = 2 , max.nc = 20, method = "kmeans")
+###based on the output no.of cluster = 3. so K=3
+
+#alternate to find k.
+table(nc_es$Best.n[1,])
+barplot(table(nc_es$Best.n[1,]),xlab="No. of clusters",ylab="Number of criteria",main="Number of clusters chosen by 26 criteria")
+#######here maximum is 3
+
+#fit model
+es_kmeans<-kmeans(es_scale,3)
+
+#assign cluster membership for each row like z1,z2,z3
+clusplot(es_scale,es_kmeans$cluster,color = TRUE,shade = TRUE, labels = 2,lines = 0)
+
+#aggregate
+es_new<-data.frame(es_scale,es_kmeans$cluster)
+
+#cluster name
+agg_es_new<-aggregate(es_new[1:2],by=list(es_new$es_kmeans.cluster),FUN="mean")
+agg_es_new
+#####group 2 both the cvm and xom stock price is high on those days
+#####group 1 both stock price are very low on those days
+#####group 3 both stock price are low on those days
+
+#####based on the domain we are interested to go with k = 2 whether high or low.
+
+
+
+#stability of the cluster - evaluating the goodness of fit
+#silhoutte distance
+#clusterboot(joccard distance)
+
+#Silhoutee width
+dis_sp=dist(es_scale)^2
+sil_width_sp<-silhouette(es_kmeans$cluster,dis_sp)
+windows()
+plot(sil_width_sp)
+sil_width_sp 
+#score of +1 indicates that the sample that the sample we are using is far away from its near by clustering
+#score of 0 indicates that the sample that the sample we used is on the decision boundry which seperate two clustering
+#score of -1 indicates that the sample that the sample we used is assigned to a wrong cluster.
+sil_sum_sp<-summary(sil_width_sp)
+sil_sum_sp$clus.avg.widths
+sil_sum_sp$avg.width
+barplot(sil_sum_sp$clus.avg.widths,horiz = TRUE)
+
+
+#Evaluating cluster stability - clusterboot
+d_sp<-dist(es_scale)
+cboot_sp<-clusterboot(d_sp,clustermethod=kmeansCBI,k=2,bootmethod="boot",seed=15544)
+cboot_sp
+
+#if j is less than 0.5 then it is dissolved (not a real cluster)
+#if j is between 0.6 to 0.75 then clusters are stables and clusters are able to measure the patterns and points.
+#is the j is more than 0.8 the clusters are highly stable.
+
+#to find k (another method)
+##gap statistic
+gap_es<-clusGap(es_scale,FUNcluster = kmeans,K.max=20)
+gap_df_es<-as.data.frame(gap_es$Tab)
+min(gap_df_es$gap)
+gap_es$FUNcluster()
+gap_df_es$gap
+gap_es
+
+#in gap column it will increase and at some point it will reduce so take till before.eg till 5 rows it is increasing and at 6th row it is reducing then k=5.
+
+
+######################################################################################
+#import the data
+sp<-read.csv("C:\\Users\\anish\\Downloads\\kmeansSP.csv")
+
+
+#scale the data
+sp_scale<-scale(sp[-1])
+sp_scale
+
+#no of clusters
+nc_sp <-NbClust(sp_scale, min.nc = 2 , max.nc = 20, method = "kmeans")
+
+#alternate to find k.
+table(nc_sp$Best.n[1,])
+barplot(table(nc_sp$Best.n[1,]),xlab="No. of clusters",ylab="Number of criteria",main="Number of clusters chosen by 26 criteria")
+#######here maximum is 3
+
+#fit model
+sp_kmeans<-kmeans(sp_scale,2)
+
+#assign cluster membership for each row like z1,z2,z3
+clusplot(sp_scale,sp_kmeans$cluster,color = TRUE,shade = TRUE, labels = 2,lines = 0)
+
+#aggregate
+sp_new<-data.frame(sp_scale,sp_kmeans$cluster)
+
+#cluster name
+agg_sp_new<-aggregate(sp_new[1:2],by=list(sp_new$sp_kmeans.cluster),FUN="mean")
+agg_es_new
+
+#
+dist_sp=dist(sp_scale)^2
+sil_width_sp1<-silhouette(sp_kmeans$cluster,dist_sp)
+windows()
+plot(sil_width_sp1)
+sil_width_sp1 
+
+sil_sum_sp1<-summary(sil_width_sp1)
+sil_sum_sp1$clus.avg.widths
+sil_sum_sp1$avg.width
+barplot(sil_sum_sp1$clus.avg.widths,horiz = TRUE)
+
+
+#Evaluating cluster stability - clusterboot
+d_sp1<-dist(sp_scale)
+cboot_sp<-clusterboot(d_sp,clustermethod=kmeansCBI,k=2,bootmethod="boot",seed=15544)
+cboot_sp
+
+###############################################################################################
+#Clustering Mixed Variable Types
+#Dataset-loan default dataset
+college_data<-read.csv("C:\\Users\\anish\\Downloads\\college.csv")
+str(college_data)
+names(college_data)
+library(cluster)
+library(stats)
+library(fpc)
+library(NbClust)
+df<-college_data[,-1]
+str(df)
+
+df[,'Private']<-as.factor(df[,'Private'])
+
+dist<-daisy(df,metric='gower')
+
+dist_mat<-as.matrix(dist)
+print(dist_mat)
+
+coll_clust<-pam(dist,k=3,diss=TRUE)
+
+coll_clust$clustering
+clusplot(df,coll_clust$clustering)
+
+library(Rtsne)
+library(ggplot2)
+library(dplyr)
+
+tsne_obj <- Rtsne(dist, is_distance = TRUE)
+
+tsne_data <- tsne_obj$Y %>%
+  data.frame() %>%
+  setNames(c("X", "Y")) %>%
+  mutate(cluster = factor(coll_clust$clustering),
+         name = college_data$X)
+
+ggplot(aes(x = X, y = Y), data = tsne_data) +
+  geom_point(aes(color = cluster))
+
+#Cluster profiles
+Cluster=coll_clust$clustering
+df_new<-cbind(college_data,Cluster)
+agg_clust<-aggregate(df_new[-c(1:2)],by=list(cluster=Cluster),median)
+agg_clust
