@@ -1,0 +1,64 @@
+##ADA BOOST
+
+#Libraries
+library(adabag)
+library(caret)
+
+#Load file
+GCD<-read.csv("C:\\Users\\anish\\Downloads\\german_credit.csv")
+str(GCD)
+names(GCD)
+
+#Convert integers/numeric to factors
+
+GCD$Creditability<-as.factor(GCD$Creditability)
+GCD$Account.Balance<-as.factor(GCD$Account.Balance)
+GCD$Payment.Status.of.Previous.Credit<-as.factor(GCD$Payment.Status.of.Previous.Credit)
+GCD$Purpose<-as.factor(GCD$Purpose)
+GCD$Value.Savings.Stocks<-as.factor(GCD$Value.Savings.Stocks)
+GCD$Length.of.current.employment<-as.factor(GCD$Length.of.current.employment)
+GCD$Instalment.per.cent<-as.factor(GCD$Instalment.per.cent)
+GCD$Sex...Marital.Status<-as.factor(GCD$Sex...Marital.Status)
+GCD$Guarantors<-as.factor(GCD$Guarantors)
+GCD$Duration.in.Current.address<-as.factor(GCD$Duration.in.Current.address)
+GCD$Most.valuable.available.asset<-as.factor(GCD$Most.valuable.available.asset)
+GCD$Concurrent.Credits<-as.factor(GCD$Concurrent.Credits)
+GCD$Type.of.apartment<-as.factor(GCD$Type.of.apartment)
+GCD$No.of.Credits.at.this.Bank<-as.factor(GCD$No.of.Credits.at.this.Bank)
+GCD$Occupation<-as.factor(GCD$Occupation)
+GCD$No.of.dependents<-as.factor(GCD$No.of.dependents)
+GCD$Telephone<-as.factor(GCD$Telephone)
+GCD$Foreign.Worker<-as.factor(GCD$Foreign.Worker)
+
+#Partition Data
+set.seed(1234)
+GCD_mixed<-createDataPartition(GCD$Creditability,p=.7,list=FALSE)
+GCD_train<-GCD[GCD_mixed,]
+GCD_test<-GCD[-GCD_mixed,]
+
+#Fit a boosting model
+GC_boost<-boosting(Creditability~.,data=GCD_train[-1],boos=TRUE,v=10,coeflearn = "Freund",mfinal=100)
+GC_boost
+#Predict test labels
+GC_boost_pred<-predict(GC_boost,newdata=GCD_test,type="prob")
+GC_boost_pred
+#Confusion matrix
+GC_boost_pred$confusion
+
+#Create ROC and derive AUC
+neDF_GDC<-cbind(GCD_test,GC_boost_pred$prob)
+neDF_GDC
+write.csv(neDF_GDC,"c:\\Users\\anish\\Downloads\\GCD_Pred3.csv")
+decileData<-read.csv(file.choose())
+str(decileData)
+decileData$Creditability<-as.factor(decileData$Creditability)
+
+#ROC Analysis
+library(ROCit)
+roc_GCD<-rocit(decileData$prob,decileData$Creditability)
+plot(roc_GCD)
+roc_GCD$AUC
+
+#deciles
+deciles_GCD<-cut(decileData$prob,quantile(decileData$prob,(0:10)/10),include.lowest=TRUE)
+table(deciles_GCD,decileData$Creditability)
